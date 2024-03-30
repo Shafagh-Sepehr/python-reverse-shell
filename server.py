@@ -96,8 +96,9 @@ class Row(tk.Frame):
         self.terminal_text = ""
 
         tk.Label(self, textvariable=self.name).pack(side=tk.LEFT)
-        tk.Button(self, text="terminal", command=self.open_terminal).pack(side=tk.RIGHT)
+        tk.Button(self, text="terminate", command=self.terminate).pack(side=tk.RIGHT)
         tk.Button(self, text="rename", command=self.rename_dialog).pack(side=tk.RIGHT)
+        tk.Button(self, text="terminal", command=self.open_terminal).pack(side=tk.RIGHT)
 
     def rename_dialog(self):
         new_name = simpledialog.askstring("Rename", "Enter new name")
@@ -117,6 +118,10 @@ class Row(tk.Frame):
         if not response:
             self.destroy()
             return self
+
+    def terminate(self):
+        self.destroy()
+        self.app.rows.remove(self)
 
     def make_path(self, file_name, dest):
         if os.path.exists(dest):
