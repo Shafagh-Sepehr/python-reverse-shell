@@ -134,13 +134,11 @@ class Row(tk.Frame):
                 path = dest
         return path
 
-    def get_data(self, mode="norm", dest=None):
+    def get_data(self, mode="norm", dest=None, name=None):
         whole_data = ""
         data = self.conn.recv(HEADER)
         if not data:
             return (whole_data, False)
-
-        print("debug", data, mode)
 
         typ, size, rest = data.split("<SEPARATOR>".encode(FORMAT), 2)
 
@@ -162,7 +160,21 @@ class Row(tk.Frame):
             file_name = typ.split("/")[-1]
             file_size = size
 
-            path = self.make_path(file_name, dest)
+            response, rest = rest.split("<SEPARATOR>".encode(FORMAT), 1)
+
+            if response.decode(FORMAT) == "err":
+                return ("file download failed - No such file or directory", True)
+
+            path: str = self.make_path(file_name, dest)
+            if name:
+                path_parts = path.rsplit("/", 1)
+                parts = path_parts[-1].split(".", 1)
+                if len(parts) == 1:
+                    path += "_" + name
+                else:
+                    path = parts[0] + "_" + name + "." + parts[1]
+                    if len(path_parts) > 1:
+                        path = path_parts[0] + "/" + path
 
             ret_size = len(rest)
             try:
@@ -173,17 +185,17 @@ class Row(tk.Frame):
 
                         bytes_read = self.conn.recv(HEADER)
                         if not bytes_read:
-                            return ("fail", False)
+                            return ("file download failed", False)
                         ret_size += len(bytes_read)
                         f.write(bytes_read)
-                return ("seccuss", True)
+                return ("file download was successful", True)
             except FileNotFoundError:
                 while ret_size < file_size:
                     bytes_read = self.conn.recv(HEADER)
                     if not bytes_read:
-                        return ("fail", False)
+                        return ("file download failed", False)
                     ret_size += len(bytes_read)
-                return ("No such file or directory - downloading to program path", True)
+                return ("file download failed - No such file or directory", True)
 
 
 class Terminal(tk.Toplevel):
@@ -216,17 +228,22 @@ class Terminal(tk.Toplevel):
 
         self.minsize(1300, 500)
 
-    def upload(self, path):
+    def upload(self, path, conn=None):
+        if conn:
+            connection = conn
+        else:
+            connection = self.conn
+
         file_size = os.path.getsize(path)
         send_data = path.split("/")[-1] + "<SEPARATOR>" + str(file_size) + "<SEPARATOR>"
-        self.conn.sendall(send_data.encode(FORMAT))
+        connection.sendall(send_data.encode(FORMAT))
 
         with open(path, "rb") as f:
             while True:
                 bytes_read = f.read(HEADER)
                 if not bytes_read:
                     break
-                self.conn.sendall(bytes_read)
+                connection.sendall(bytes_read)
 
     def on_send(self):
         inp = self.text_area.get("0.0", "end")
@@ -240,6 +257,17 @@ class Terminal(tk.Toplevel):
         if splits[0] == "DOWNLOAD":
             data_to_send = wrap_data(splits[1], "dwnl")
         elif splits[0] == "UPLOAD":
+            try:
+                os.path.getsize(splits[1])
+            except FileNotFoundError:
+                if self.conn:
+                    self.append_to_read_area("file download failed - No such file\n")
+                else:
+                    if PUBLIC_TERMINAL_FILLS_PERSONAL:
+                        for row in self.app.rows:
+                            row.terminal_text += "file download failed - No such file\n"
+                    self.append_to_read_area("file download failed - No such file\n")
+
             data_to_send = wrap_data(dest, "upld")
         else:
             data_to_send = wrap_data(inp, "norm")
@@ -251,8 +279,7 @@ class Terminal(tk.Toplevel):
                 data, online = self.listen_for_answer("dwnl", dest)
             elif splits[0] == "UPLOAD":
                 self.upload(splits[1])
-                # data, online = self.listen_for_answer("norm")
-                data = "success"
+                data, online = self.listen_for_answer("norm")
             else:
                 data, online = self.listen_for_answer("norm")
 
@@ -263,7 +290,15 @@ class Terminal(tk.Toplevel):
         else:
             for row in self.app.rows:
                 row.conn.sendall(data_to_send.encode(FORMAT))
-                data, online = row.get_data()
+
+                if splits[0] == "DOWNLOAD":
+                    data, online = row.get_data("dwnl", dest, row.name.get())
+                elif splits[0] == "UPLOAD":
+                    self.upload(splits[1], row.conn)
+                    data, online = row.get_data("norm")
+                else:
+                    data, online = row.get_data("norm")
+
                 data = strip_ansi_escape_sequences(data)
                 if PUBLIC_TERMINAL_FILLS_PERSONAL:
                     row.terminal_text += data + "\n"
@@ -293,6 +328,7 @@ class Terminal(tk.Toplevel):
         self.read_area.config(state="normal")
         self.read_area.insert("end", str)
         self.read_area.insert("end", "\n")
+        self.read_area.insert("end", "----------------------------------------\n")
         self.read_area.config(state="disabled")
 
     def listen_for_answer(self, mode, dest=None):
