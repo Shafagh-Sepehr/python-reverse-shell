@@ -151,7 +151,6 @@ class Row(tk.Frame):
         size = int(size.decode(FORMAT))
 
         if mode == "norm":
-            print("in norm")
             whole_data = rest.decode(FORMAT)
             ret_size = len(data)
             while size > ret_size:
