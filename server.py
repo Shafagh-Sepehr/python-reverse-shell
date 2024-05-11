@@ -253,6 +253,10 @@ class Terminal(tk.Toplevel):
 
     def on_send(self):
         inp = self.text_area.get("0.0", "end")
+        if inp[0] == "\n":
+            inp = inp[1:]
+        self.append_to_read_area(str("$ " + inp + "\n").strip("\n"))
+        self.text_area.delete("0.0", "end")
 
         splits = inp.strip().split(" ", 2)
         if len(splits) < 3:
