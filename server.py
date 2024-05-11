@@ -167,6 +167,7 @@ class Row(tk.Frame):
             response, rest = rest.split("<SEPARATOR>".encode(FORMAT), 1)
 
             if response.decode(FORMAT) == "err":
+                print(2)
                 return ("file download failed - No such file or directory", True)
 
             path: str = self.make_path(file_name, dest)
@@ -199,6 +200,7 @@ class Row(tk.Frame):
                     if not bytes_read:
                         return ("file download failed", False)
                     ret_size += len(bytes_read)
+                print(1)
                 return ("file download failed - No such file or directory", True)
 
 
