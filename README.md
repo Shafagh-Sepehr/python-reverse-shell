@@ -1,4 +1,4 @@
-# local client-server project written in C++ using TCP socket.  
+## local client-server project written in C++ using TCP socket.  
 the server can handle multiple clients simultaneously.  
 the client app is a malicious calculator(the graphical interface) that after running connects to the server. and the server can run Linux commands on the victim's machine (the terminal is opened in the same directory the calculator was in) and receive the outputs of that command.  
 
